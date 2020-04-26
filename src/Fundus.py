@@ -28,12 +28,12 @@ class Fundus():
         self.palette, self.counts = self.get_palette()
 
     # Constructors
-    @classmethod
-    def _image_from_file(self, path):
+    @staticmethod
+    def _image_from_file(path):
         return Image.open(path, mode="r")
 
-    @classmethod
-    def _image_from_pixels(self, pixels, **kwargs):
+    @staticmethod
+    def _image_from_pixels(pixels, **kwargs):
         arr = np.resize(pixels, kwargs.get("w", None), kwargs.get("w", None))
         return Image.fromarray(arr)
 
