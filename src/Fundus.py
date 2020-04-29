@@ -1,6 +1,7 @@
 # Built-In libraries
 import os
 import copy
+import itertools
 
 # External libraries
 import PIL
@@ -9,8 +10,9 @@ import numpy as np
 import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap, rgb2hex, BoundaryNorm
+from matplotlib.colors import ListedColormap, rgb2hex, BoundaryNorm 
 from matplotlib.colorbar import ColorbarBase
+from tqdm import tqdm
 
 import pandas as pd
 import scipy.cluster.hierarchy as shc
@@ -26,9 +28,16 @@ class Fundus():
 
         if isinstance(source, np.ndarray):
             self.im = self._image_from_pixels(source, **kwargs)
+            
+        if isinstance(source, PIL.Image.Image):
+            # TODO: need to re-name the class
+            self.im = source
 
         # Attributes
         self.palette, self.counts = self.get_palette()
+        
+        # Attributes
+        self.cmap = self.get_cmap()
 
     # Constructors
     @staticmethod
@@ -45,19 +54,28 @@ class Fundus():
 
     # Get attributes
     def get_palette(self):
-        pixels = self.get_pixels()
-        return np.unique(pixels, axis=0, return_counts=True)
+        unique, counts = np.unique(self.get_pixels(), axis=0, return_counts=True)
+        #unique[np.argsort(counts)][::-1]
+        return unique, counts
+    
+    def get_cmap(self):
+        # Transform 0-255 RGB to 0-1 RGB        
+        # Create a color map form the provided colors
+        return ListedColormap(self.palette/255, N=len(self.palette))
+    
+    def get_palette_sorted(self):
+        return self.palette[np.argsort(self.counts)][::-1]
 
     # Data Transformations
     def as_array(self):
         return np.asarray(self.im)
 
-    def get_channels(self):
-        """
-        :return np.array [c * x * y] [3 * w * h]
-        """
-        r, g, b = self.as_array().T
-        return r, g, b
+#    def get_channels(self):
+#        """
+#        :return np.array [c * x * y] [3 * w * h]
+#        """
+#        r, g, b = self.as_array().T
+#        return r, g, b
 
     def get_channels_flattened(self):
         """
@@ -66,7 +84,7 @@ class Fundus():
 
         :return: np.array for R, G, B channels respectively.
         """
-        r, g, b = self.get_channels()
+        r, g, b = self.as_array().T
         return r.flatten(), g.flatten(), b.flatten()
 
     def get_pixels(self):
@@ -80,9 +98,12 @@ class Fundus():
     # VISUALIZATION
     @staticmethod
     def plot_color_bar(colors):
+        # Transform 0-255 RGB to 0-1 RGB
+        colors = colors/255
+        
         # Create a color map form the provided colors
         cmap = ListedColormap(colors)
-
+        
         # Convert the colors to hex
         hex = np.array([rgb2hex(x) for x in colors])
 
@@ -108,28 +129,36 @@ class Fundus():
                            orientation="horizontal")
 
         bar.set_ticklabels(hex)
+    
+    def plot_palette(self):
+        self.plot_color_bar(np.sort(self.palette, axis=0))
 
     # MODIFICATION FILTERING
-    def replace_pixels(self, colors, replacement=(0, 0, 0)):
+    def mask(self, colors, replacement=(0, 0, 0), inplace=False, inverse=False):
         """
         Replaces a list of pixels for a given value
         :param colors: 2-D array of the RGB pixel values for the image.
         :param replacement: 1-D [0-255] RGB array of the color to replace with
         :return: modified 2-D array
         """
-        pixels = self.get_pixels()
-        for c in colors:
-            pixels[(self.get_pixels() == c).all(axis=1)] = replacement
-        return pixels
+        # Stablish canvas
+        if inverse:
+            # Black canvas
+            pixels = np.zeros(self.get_pixels().shape, dtype=np.uint8)
+        else:
+            # Original image
+            pixels = self.get_pixels()
+        
+        # Mask pixels
+        for c in tqdm(colors):
+            # Skips black
+            if (c == [0, 0, 0]).all():
+                continue
+            pixels[(self.get_pixels() == c).all(axis=1)] = c if inverse else replacement
 
-    def clear_pixels(self, colors, inplace=False):
-        """
-        Clears a list of colors from the image the rest are set to black
-        :param colors: 2-D array of the RGB pixel values to clear
-        :param inplace: Boolean
-        :return: modified 2-D array
-        """
-        pixels = self.get_pixels()
-        for c in colors:
-            pixels[(self.get_pixels() != c).all(axis=1)] = [0, 0, 0]
-        return pixels
+        # Output 
+        if inplace:
+            self.im = self._image_from_pixels(pixels, w=self.im.size[0], h=self.im.size[1])
+        else:
+            return pixels
+ 
