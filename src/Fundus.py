@@ -55,7 +55,6 @@ class Fundus():
     # Get attributes
     def get_palette(self):
         unique, counts = np.unique(self.get_pixels(), axis=0, return_counts=True)
-        #unique[np.argsort(counts)][::-1]
         return unique, counts
     
     def get_cmap(self):
@@ -66,17 +65,6 @@ class Fundus():
     def get_palette_sorted(self):
         return self.palette[np.argsort(self.counts)][::-1]
 
-    # Data Transformations
-    def as_array(self):
-        return np.asarray(self.im)
-
-#    def get_channels(self):
-#        """
-#        :return np.array [c * x * y] [3 * w * h]
-#        """
-#        r, g, b = self.as_array().T
-#        return r, g, b
-
     def get_channels_flattened(self):
         """
         Returns per color channel a 1-D array of size  (w * h) with all
@@ -84,7 +72,7 @@ class Fundus():
 
         :return: np.array for R, G, B channels respectively.
         """
-        r, g, b = self.as_array().T
+        r, g, b = np.asarray(self.im).T
         return r.flatten(), g.flatten(), b.flatten()
 
     def get_pixels(self):
