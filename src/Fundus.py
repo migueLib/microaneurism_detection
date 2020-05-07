@@ -34,9 +34,7 @@ class Fundus():
             self.im = source
 
         # Attributes
-        self.palette, self.counts = self.get_palette()
-        
-        # Attributes
+        self._palette, self._counts = np.unique(self.get_pixels(), axis=0, return_counts=True)
         self.cmap = self.get_cmap()
 
     # Constructors
@@ -53,17 +51,21 @@ class Fundus():
         return im
 
     # Get attributes
-    def get_palette(self):
-        unique, counts = np.unique(self.get_pixels(), axis=0, return_counts=True)
-        return unique, counts
+    @property
+    def palette(self):
+        return self._palette
+    
+    @property
+    def counts(self):
+        return self.counts
     
     def get_cmap(self):
         # Transform 0-255 RGB to 0-1 RGB        
         # Create a color map form the provided colors
-        return ListedColormap(self.palette/255, N=len(self.palette))
+        return ListedColormap(self._palette/255, N=len(self._palette))
     
     def get_palette_sorted(self):
-        return self.palette[np.argsort(self.counts)][::-1]
+        return self.palette[np.argsort(self._counts)][::-1]
 
     def get_channels_flattened(self):
         """
@@ -119,7 +121,7 @@ class Fundus():
         bar.set_ticklabels(hex)
     
     def plot_palette(self):
-        self.plot_color_bar(np.sort(self.palette, axis=0))
+        self.plot_color_bar(np.sort(self._palette, axis=0))
 
     # MODIFICATION FILTERING
     def mask(self, colors, replacement=(0, 0, 0), inplace=False, inverse=False):
