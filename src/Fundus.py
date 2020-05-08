@@ -34,7 +34,10 @@ class Fundus():
             self.im = source
 
         # Attributes
-        self._palette, self._counts = np.unique(self.get_pixels(), axis=0, return_counts=True)
+        self._pixels = np.array(self.get_channels_flattened()).T
+        
+        self._palette, self._counts = np.unique(self._pixels, axis=0, return_counts=True)
+        
         self.cmap = self.get_cmap()
 
     # Constructors
@@ -57,7 +60,11 @@ class Fundus():
     
     @property
     def counts(self):
-        return self.counts
+        return self._counts
+    
+    @property
+    def pixels(self):
+        return self._pixels
     
     def get_cmap(self):
         # Transform 0-255 RGB to 0-1 RGB        
@@ -77,13 +84,6 @@ class Fundus():
         r, g, b = np.asarray(self.im).T
         return r.flatten(), g.flatten(), b.flatten()
 
-    def get_pixels(self):
-        """
-        Returns 2-D array of the RGB pixel values for the whole image.
-        size = 3 * (w * h)
-        :return: np.array
-        """
-        return np.array(self.get_channels_flattened()).T
 
     # VISUALIZATION
     @staticmethod
@@ -124,31 +124,23 @@ class Fundus():
         self.plot_color_bar(np.sort(self._palette, axis=0))
 
     # MODIFICATION FILTERING
-    def mask(self, colors, replacement=(0, 0, 0), inplace=False, inverse=False):
+    def mask(self, colors, replacement, inplace=False, inverse=False):
         """
         Replaces a list of pixels for a given value
         :param colors: 2-D array of the RGB pixel values for the image.
         :param replacement: 1-D [0-255] RGB array of the color to replace with
         :return: modified 2-D array
         """
-        # Stablish canvas
-        if inverse:
-            # Black canvas
-            pixels = np.zeros(self.get_pixels().shape, dtype=np.uint8)
-        else:
-            # Original image
-            pixels = self.get_pixels()
+        # Empty black canvas if inverse else image
+        pixels = np.zeros(self._pixels.shape, dtype=np.uint8) if inverse else self._pixels
         
         # Mask pixels
-        for c in tqdm(colors):
-            # Skips black
-            if (c == [0, 0, 0]).all():
-                continue
-            pixels[(self.get_pixels() == c).all(axis=1)] = c if inverse else replacement
+        for c in colors:
+            #pixels[(self._pixels == c).all(axis=1)] = c if inverse else replacement
+            pixels[(self._pixels == c).all(axis=1)] = replacement
 
         # Output 
-        if inplace:
-            self.im = self._image_from_pixels(pixels, w=self.im.size[0], h=self.im.size[1])
-        else:
-            return pixels
+        #if inplace:
+        #    self.im = self._image_from_pixels(pixels, w=self.im.size[0], h=self.im.size[1])
+        return pixels
  
