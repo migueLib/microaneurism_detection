@@ -21,6 +21,7 @@ from src.plots import plot_color_bar
 
 class Fundus():
     def __init__(self, source=False, **kwargs):
+        
         # Constructors
         if isinstance(source, str):
             self.im = self._image_from_file(source)
@@ -30,6 +31,9 @@ class Fundus():
             
         if isinstance(source, PIL.Image.Image):
             self.im = source
+            
+        if isinstance(source, torch.Tensor):
+            self.im = source.to("cpu").numpy().astype(np.uint8)
 
         # Attributes
         self._pixels = self._get_pixels()
@@ -90,7 +94,6 @@ class Fundus():
         # Mask pixels
         for c in colors:
             canvas[(self._pixels == c).all(axis=1)] = replacement if replacement is not None else [0, 255, 0]
-            #canvas[(self._pixels == c)] = replacement if replacement is not None else [0, 255, 0]
 
         # Output in place
         self.im = self._image_from_pixels(canvas, w=self.w, h=self.h) if inplace else self.im
