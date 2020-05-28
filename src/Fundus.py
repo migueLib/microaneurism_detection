@@ -33,7 +33,7 @@ class Fundus():
             self.im = source
             
         if isinstance(source, torch.Tensor):
-            self.im = source.to("cpu").numpy().astype(np.uint8)
+            self.im = Image.fromarray(source.to("cpu").numpy().astype(np.uint8))
 
         # Attributes
         self._pixels = self._get_pixels()
@@ -100,6 +100,68 @@ class Fundus():
         
         
         return canvas
+    
+    
+    def mask_torch(self, colors, replacement=None, inplace=False, inverse=False, in_cpu=True):
+        """
+        Replaces pixels 
+        """
+
+        # Emtpy black canvas if inverse else use the image
+        pixels_tensor = torch.cuda.ByteTensor(self.pixels)
+
+        if inverse:
+            canvas = torch.cuda.ByteTensor(pixels_tensor.shape).fill_(0)
+        else:
+            canvas = torch.cuda.ByteTensor(self.pixels)
+
+        # Create tensors in gpu directly
+        replacement_tensor = torch.cuda.ByteTensor([[0,255,0]]) if replacement is None else torch.cuda.ByteTensor(replacement)
+        colors_tensor = torch.cuda.ByteTensor(colors)
+
+        # Compare pixels to list of colors
+        for c in colors_tensor:
+
+            # Create flag tensor for pixels to change
+            ispixel = (pixels_tensor==c).all(dim=1).view(1, len(pixels_tensor))
+            ispixel = torch.transpose(torch.cat((ispixel, ispixel, ispixel), dim=0), 0, 1)
+
+            # Replace pixels
+            canvas = torch.where(ispixel, replacement_tensor, canvas)
+
+        # Output in place
+        #canvas = canvas.to("cpu").numpy().astype(np.uint8)
+        #self.im = self._image_from_pixels(canvas, w=self.w, h=self.h) if inplace else self.im
+        canvas = canvas.to("cpu").numpy().astype(np.uint8) if in_cpu else canvas
+        
+        return canvas
+    
+    
+    def cluster_pixels(self, n):
+        pal = self.palette
+
+        cluster = AgglomerativeClustering(n_clusters=n, affinity='euclidean', linkage='ward')
+        clustered = cluster.fit_predict(pal)
+
+        a = np.zeros(self.pixels.shape, dtype=np.uint8)
+        for c in tqdm(np.unique(clustered)):
+            a+=self.mask(pal[clustered == c], inverse=True, replacement=pal[clustered == c][0])
+
+        return a
+    
+    def cluster_pixels_torch(self, n):
+        pal = self.palette
+
+        cluster = AgglomerativeClustering(n_clusters=n, affinity='euclidean', linkage='ward')
+        clustered = cluster.fit_predict(pal)
+
+        a = torch.cuda.ByteTensor(self.pixels.shape[0],self.pixels.shape[1]).fill_(0)
+        for c in tqdm(np.unique(clustered)):
+            #plot_color_bar(pal[clustered == c][0])
+            a += self.mask_torch(pal[clustered == c], replacement=pal[clustered == c][0], inverse=True, in_cpu=False)
+
+        return Fundus(a.to("cpu").numpy(), w=self.w, h=self.h)
+
     
     
 
