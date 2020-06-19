@@ -75,6 +75,10 @@ class Fundus():
         r, g, b = r.flatten(), g.flatten(), b.flatten()
         pre_palette = zip(r, g, b)
         return np.asarray(list(set(pre_palette)))
+    
+    def _get_color_frequency(self):
+        return {tuple(col):np.sum((self.pixels==col).all(axis=1)) for col in self.palette}
+        # self.palette, self.counts = np.unique(self.pixels, return_counts=True)
 
     # VISUALIZATION    
     def plot_palette(self):
@@ -152,17 +156,23 @@ class Fundus():
     def cluster_pixels_torch(self, n):
         pal = self.palette
 
+        # Getting color clusters
         cluster = AgglomerativeClustering(n_clusters=n, affinity='euclidean', linkage='ward')
         clustered = cluster.fit_predict(pal)
 
-        a = torch.cuda.ByteTensor(self.pixels.shape[0],self.pixels.shape[1]).fill_(0)
-        for c in tqdm(np.unique(clustered)):
-            #plot_color_bar(pal[clustered == c][0])
-            a += self.mask_torch(pal[clustered == c], replacement=pal[clustered == c][0], inverse=True, in_cpu=False)
+                
+        a = torch.cuda.ByteTensor(self.pixels.shape[0], self.pixels.shape[1]).fill_(0)        
+        freq = self._get_color_frequency()
+        
+        # Iterating over each cluster
+        for c in tqdm(range(n)):
+            c_col = pal[clustered == c]
+            
+            # Count, sort and take the most common color
+            rep = [freq[tuple(col)] for col in c_col]
+            rep = c_col[np.argsort(rep)][-1]
+            
+            # take cluster and replace with the most common color
+            a += self.mask_torch(c_col, rep, inverse=True, in_cpu=False)
 
         return Fundus(a.to("cpu").numpy(), w=self.w, h=self.h)
-
-    
-    
-
- 
